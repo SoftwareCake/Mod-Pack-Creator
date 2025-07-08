@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mod Pack Creator</title>
+	<link rel="stylesheet" href="CSS/Style.css">
+</head>
+<body>
+    <div class="container">
+        <h1>Mod Pack Creator</h1>
+        
+        <div class="card">
+            <h2>Build Mod</h2>
+            
+            <form id="requestForm">
+                <div class="form-group">
+                    <label for="requestName">Mod Name</label>
+                    <input type="text" id="requestName" placeholder="My API Request">
+                </div>
+                
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="method">Method</label>
+                        <select id="method" required>
+                            <option value="GET">GET</option>
+                            <option value="POST">POST</option>
+                            <option value="PUT">PUT</option>
+                            <option value="DELETE">DELETE</option>
+                            <option value="PATCH">PATCH</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="baseUrl">Base URL</label>
+                        <input type="url" id="baseUrl" required placeholder="https://api.example.com/endpoint">
+                    </div>
+                </div>
+                
+                <div class="url-preview" id="urlPreview">https://api.example.com/endpoint</div>
+                
+                <div class="section-header">
+                    <span class="section-title">URL Parameters</span>
+                    <button type="button" id="addParam" class="btn btn-secondary">Add Parameter</button>
+                </div>
+                
+                <div id="paramsContainer">
+                    <div class="empty-state" id="emptyParams">No parameters added</div>
+                </div>
+                
+                <div class="section-header">
+                    <span class="section-title">Custom Functions</span>
+                    <button type="button" id="addFunction" class="btn btn-secondary">Add Function</button>
+                </div>
+                
+                <div id="functionsContainer">
+                    <div class="empty-state" id="emptyFunctions">No functions added</div>
+                </div>
+                
+                <div style="display: flex; gap: 12px;">
+                    <button type="button" id="testApi" class="btn btn-secondary" style="flex: 1;">Test API</button>
+                    <button type="button" id="executeFunctions" class="btn btn-success" style="flex: 1;">Execute Functions</button>
+                    <button type="submit" class="btn btn-primary" style="flex: 1;">Save Request</button>
+                </div>
+            </form>
+        </div>
+        
+        <div class="card" id="responseCard" style="display: none;">
+            <h2>API Response</h2>
+            <div class="section-header">
+                <span class="section-title" id="responseStatus"></span>
+                <div class="btn-group">
+                    <button type="button" id="selectAll" class="btn btn-secondary" style="display: none;">Select All</button>
+                    <button type="button" id="getSelected" class="btn btn-success" style="display: none;">Get Selected</button>
+                    <button type="button" id="closeResponse" class="btn btn-secondary">Close</button>
+                </div>
+            </div>
+            <div id="responseContainer">
+                <div id="checkboxList" style="display: none; max-height: 400px; overflow-y: auto;"></div>
+                <pre id="responseBody" style="background: #f8f9fa; padding: 12px; border-radius: 6px; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;"></pre>
+            </div>
+        </div>
+		
+		<div class="card" id="executionCard"">
+            <h2>Execution Log</h2>
+            <div id="executionLog" class="execution-log"></div>
+        </div>
+        
+        <div class="card">
+            <div class="section-header">
+                <h2>Saved Requests</h2>
+                <button type="button" id="clearAll" class="btn btn-danger">Clear All</button>
+            </div>
+            
+            <div id="savedRequests">
+                <div class="empty-state">No saved requests yet</div>
+            </div>
+        </div>
+    </div>
+	<script src="Script/Scripts.js"></script>
+</body>
+</html>
