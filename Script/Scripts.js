@@ -32,7 +32,7 @@ const functionTemplates = {
         value: '?',
         placeholder: '{response.data.status} === "active" ? "User is active" : "User is inactive"'
     },
-	'custom': {
+	'Custom': {
 		description: 'custom javascript code',
 		value: '{}',
 		placeholder: 'console.log("custom function executed")'
@@ -133,7 +133,7 @@ document.getElementById('addFunction').addEventListener('click', function() {
 					'<option value="Loop">Loop</option>'+
 					'<option value="Calculate">Calculate</option>'+
 					'<option value="IfElse">If/Else</option>'+
-					'option value="Custom">Custom</option>'+
+					'<option value="Custom">Custom</option>'+
 				'</select>'+
 			'</div>'+
 			'<button type="button" class="btn btn-danger remove-function">Remove</button>'+
