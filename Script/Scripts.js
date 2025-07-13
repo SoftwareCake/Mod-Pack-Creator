@@ -7,32 +7,38 @@ let selectedData = null;
 
 // Function templates with descriptions
 const functionTemplates = {
-	'None': {
-		description: 'Select a Type',
-		value: '',
-		placeholder: 'Select a Type'
-	},
-	'Say': {
-		description: 'Output a message or value',
-		value: 'Say:',
-		placeholder: 'Hello World or {response.data.name}'
-	},
-	'Loop': {
-		description: 'Iterate through array data',
-		value: 'Loop:',
-		placeholder: 'response.data.items or {selected}'
-	},
-	'Calculate': {
-		description: 'Perform mathematical operations',
-		value: 'Calculate:',
-		placeholder: '{response.data.price} * 1.1 or sum({selected})'
-	},
-	<!-- 'Custom': { -->
-		<!-- description: 'Custom JavaScript code', -->
-		<!-- value: '' -->
-		<!-- placeholder: 'console.log("Custom function executed")' -->
-	<!-- } -->
+    'None': {
+        description: 'Select a Type',
+        value: '',
+        placeholder: 'Select a Type'
+    },
+    'Say': {
+        description: 'Output a message or value',
+        value: '',
+        placeholder: 'Hello World or {response.data.name}'
+    },
+    'Loop': {
+        description: 'Iterate through array data',
+        value: '[]',
+        placeholder: 'response.data.items or {selected}'
+    },
+    'Calculate': {
+        description: 'Perform mathematical operations',
+        value: '()',
+        placeholder: '{response.data.price} * 1.1 or sum({selected})'
+    },
+    'IfElse': {
+        description: 'Conditional logic - format: condition ? true_value : false_value',
+        value: '?',
+        placeholder: '{response.data.status} === "active" ? "User is active" : "User is inactive"'
+    },
+	'custom': {
+		description: 'custom javascript code',
+		value: '{}',
+		placeholder: 'console.log("custom function executed")'
+	}
 };
+	
 
 // Initialize URL preview
 document.getElementById('baseUrl').addEventListener('input', updateUrlPreview);
@@ -44,15 +50,31 @@ document.getElementById('addParam').addEventListener('click', function() {
 	const paramRow = document.createElement('div');
 	paramRow.className = 'param-row';
 	paramRow.innerHTML = '<div class="form-group">'+
-								'<label>Key</label>'+
-								'<input type="text" class="param-key" placeholder="parameter">'+
-							'</div>'+
-							'<div class="form-group">'+
-								'<label>Value</label>'+
-								'<input type="text" class="param-value" placeholder="value">'+
-							'</div>'+
-							'<button type="button" class="btn btn-danger remove-param">Remove</button>'
-						;
+                        '<label>Parameter Name</label>'+
+                        '<input type="text" class="param-name" placeholder="API Parameter Name">'+
+                    '</div>'+
+                    '<div class="form-group">'+
+                        '<label>Data Type</label>'+
+                        '<select class="param-type">'+
+                            '<option value="string">String</option>'+
+                            '<option value="number">Number</option>'+
+                            '<option value="boolean">Boolean</option>'+
+                            '<option value="array">Array</option>'+
+                            '<option value="object">Object</option>'+
+                            '<option value="date">Date</option>'+
+                            '<option value="email">Email</option>'+
+                            '<option value="url">URL</option>'+
+                        '</select>'+
+                    '</div>'+
+                    '<div class="form-group">'+
+                        '<label>Key</label>'+
+                        '<input type="text" class="param-key" placeholder="parameter">'+
+                    '</div>'+
+                    '<div class="form-group">'+
+                        '<label>Value</label>'+
+                        '<input type="text" class="param-value" placeholder="value">'+
+                    '</div>'+
+                    '<button type="button" class="btn btn-danger remove-param">Remove</button>';
 	
 	document.getElementById('emptyParams').classList.add('hidden');
 	document.getElementById('paramsContainer').appendChild(paramRow);
@@ -110,7 +132,8 @@ document.getElementById('addFunction').addEventListener('click', function() {
 					'<option value="Say">Say</option>'+
 					'<option value="Loop">Loop</option>'+
 					'<option value="Calculate">Calculate</option>'+
-					<!-- <option value="Custom">Custom</option> -->
+					'<option value="IfElse">If/Else</option>'+
+					'option value="Custom">Custom</option>'+
 				'</select>'+
 			'</div>'+
 			'<button type="button" class="btn btn-danger remove-function">Remove</button>'+
@@ -189,7 +212,12 @@ document.getElementById('requestForm').addEventListener('submit', function(e) {
 		const value = row.querySelector('.param-value').value.trim();
 		
 		if (key && value) {
-			parameters.push({ key, value });
+			parameters.push({ 
+				name: row.querySelector('.param-name').value.trim(), 
+				type: row.querySelector('.param-type').value,
+				key, 
+				value 
+			});
 		}
 	});
 	
@@ -264,7 +292,7 @@ function displaySavedRequests() {
 			parametersHtml = 
 				'<div class="request-functions">'+
 					'<strong>Parameters (' + request.parameters.length + '):</strong>'+
-					request.parameters.map(param => '<div class="function-item"><div class="function-name">' + param.key + '</div><div>' + param.value + '</div></div>').join('') +
+					request.parameters.map(param => '<div class="function-item"><div class="function-name">' + (param.name || param.key) + '</div><div>' + param.key + ': ' + param.value + '</div></div>').join('') +
 				'</div>';
 		}
 		
@@ -550,6 +578,26 @@ function executeFunctions(functions, data) {
 					result = customFunc(data, selectedData, data);
 					logEntry.className += ' log-success';
 					logEntry.textContent = `${func.name}: Custom function executed`;
+					break;
+				case 'IfElse':
+					// Parse condition ? true_value : false_value
+					const parts = func.value.split('?');
+					if (parts.length === 2) {
+						const condition = parts[0].trim();
+						const values = parts[1].split(':');
+						if (values.length === 2) {
+							const conditionResult = evaluateExpression(condition, data, selectedData);
+							const trueValue = values[0].trim();
+							const falseValue = values[1].trim();
+							result = conditionResult ? evaluateExpression(trueValue, data, selectedData) : evaluateExpression(falseValue, data, selectedData);
+						} else {
+							result = 'Invalid if/else format';
+						}
+					} else {
+						result = 'Invalid if/else format';
+					}
+					logEntry.className += ' log-success';
+					logEntry.textContent = `${func.name}: ${result}`;
 					break;
 					
 				default:
@@ -844,6 +892,8 @@ function loadRequest(requestId) {
 	request.parameters.forEach(param => {
 		document.getElementById('addParam').click();
 		const lastParamRow = document.querySelector('.param-row:last-child');
+		lastParamRow.querySelector('.param-name').value = param.name || '';
+		lastParamRow.querySelector('.param-type').value = param.type || 'string';
 		lastParamRow.querySelector('.param-key').value = param.key;
 		lastParamRow.querySelector('.param-value').value = param.value;
 	});
