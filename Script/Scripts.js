@@ -39,6 +39,18 @@ const functionTemplates = {
 	}
 };
 	
+// Add event listener for file upload
+document.getElementById('uploadExcel').addEventListener('click', function() {
+    document.getElementById('excelUpload').click();
+});
+
+document.getElementById('excelUpload').addEventListener('change', function(event) {
+    const file = event.target.files[0];
+    if (file) {
+        processExcelFile(file);
+    }
+});
+	
 
 // Initialize URL preview
 document.getElementById('baseUrl').addEventListener('input', updateUrlPreview);
@@ -123,7 +135,7 @@ document.getElementById('addFunction').addEventListener('click', function() {
 	functionRow.innerHTML = '<div class="function-row-header">'+
 			'<div class="form-group">'+
 				'<label>Function Name</label>'+
-				'<input type="text" class="function-name" placeholder="My Function ${functionCount}">'+
+				`<input type="text" class="function-name" placeholder="My Function ${functionCount}">`+
 			'</div>'+
 			'<div class="form-group">'+
 				'<label>Function Type</label>'+
@@ -142,7 +154,7 @@ document.getElementById('addFunction').addEventListener('click', function() {
 			'<label>Function Code/Value</label>'+
 			'<textarea class="function-value" placeholder="" rows="3"></textarea>'+
 		'</div>'+
-		'<div class="function-description">${functionTemplates["None"].description}</div>'
+		`<div class="function-description">${functionTemplates["None"].description}</div>`
 	;
 	
 	document.getElementById('emptyFunctions').classList.add('hidden');
@@ -154,10 +166,6 @@ document.getElementById('addFunction').addEventListener('click', function() {
 	const descriptionDiv = functionRow.querySelector('.function-description');
 	
 	typeSelect.addEventListener('change', function() {
-		<!-- const selectedType = this.value; -->
-		<!-- const template = functionTemplates[selectedType]; -->
-		<!-- valueTextarea.placeholder = template.placeholder; -->
-		<!-- descriptionDiv.textContent = template.description; -->
 		handleFunctionDropdownChange(this);
 	});
 	
@@ -237,22 +245,39 @@ document.getElementById('requestForm').addEventListener('submit', function(e) {
 		}
 	});
 	
+	// Collect headers (add this after collecting parameters)
+	const headers = [];
+	document.querySelectorAll('.header-row').forEach(row => {
+		const name = row.querySelector('.header-name').value.trim();
+		const value = row.querySelector('.header-value').value.trim();
+		
+		if (name && value) {
+			headers.push({ name, value });
+		}
+	});
+
+	// Add headers to the request object
 	const request = {
 		id: Date.now(),
 		name: requestName,
 		method,
 		baseUrl,
 		parameters,
+		headers, // Add this line
 		functions,
 		url: document.getElementById('urlPreview').textContent
 	};
-	
+		
 	requests.push(request);
 	displaySavedRequests();
 	
 	// Reset form
 	document.getElementById('requestForm').reset();
 	document.getElementById('urlPreview').textContent = 'https://api.example.com/endpoint';
+	
+	// Clear headers
+	document.querySelectorAll('.header-row').forEach(row => row.remove());
+	document.getElementById('emptyHeaders').classList.remove('hidden');
 	
 	// Clear parameters and functions
 	document.querySelectorAll('.param-row').forEach(row => row.remove());
@@ -287,6 +312,21 @@ function displaySavedRequests() {
 				'</div>';
 		}
 		
+		// Add this after parametersHtml
+		let headersHtml = '';
+		if (request.headers && request.headers.length > 0) {
+			headersHtml = 
+				'<div class="request-headers">' +
+					'<strong>Headers (' + request.headers.length + '):</strong>' +
+					request.headers.map(header => 
+						'<div class="header-item">' +
+							'<div class="header-name">' + header.name + '</div>' +
+							'<div class="header-value">' + header.value + '</div>' +
+						'</div>'
+					).join('') +
+				'</div>';
+		}
+		
 		let parametersHtml = '';
 		if (request.parameters && request.parameters.length > 0) {
 			parametersHtml = 
@@ -302,25 +342,218 @@ function displaySavedRequests() {
 				'<div class="function-item"><div>' + request.baseUrl + '</div></div>'+
 			'</div>';
 		
-		requestDiv.innerHTML = '<div class="request-header">'+
-									'<div>'+
-										'<span class="method-badge method-' + request.method.toLowerCase() + '">' + request.method + '</span>'+
-										'<strong>' + request.name + '</strong>'+
-									'</div>'+
-									'<div class="btn-group">'+
-										'<button class="btn btn-secondary" onclick="loadRequest(' + request.id + ')">Load</button>'+
-										'<button class="btn btn-secondary" onclick="testSavedRequest(' + request.id + ')">Test</button>'+
-										'<button class="btn btn-success" onclick="executeSavedFunctions(' + request.id + ')">Execute</button>'+
-										'<button class="btn btn-danger" onclick="deleteRequest(' + request.id + ')">Delete</button>'+
-									'</div>'+
-								'</div>'+
-								'<div class="request-url">' + request.url + '</div>'+
-								baseUrlHtml +
-								parametersHtml +
-								functionsHtml;
+		requestDiv.innerHTML = 
+			'<div class="request-header">'+
+				'<div>'+
+					`<span class="method-badge method-${request.method.toLowerCase()}">${request.method}</span>`+
+					`<strong>${request.name}</strong>`+
+				'</div>'+
+				'<div class="btn-group">'+
+					`<button class="btn btn-secondary" onclick="loadRequest(${request.id})">Load</button>`+
+					`<button class="btn btn-secondary" onclick="testSavedRequest(${request.id})">Test</button>`+
+					`<button class="btn btn-success" onclick="executeSavedFunctions(${request.id})">Execute</button>`+
+					`<button class="btn btn-danger" onclick="deleteRequest(${request.id})">Delete</button>`+
+				'</div>'+
+			'</div>'+
+			`<div class="request-url">${request.url}</div>`+
+			`${baseUrlHtml}`+
+			`${headersHtml}`+
+			`${parametersHtml}`+
+			`${functionsHtml}`
+		;
 		
 		container.appendChild(requestDiv);
 	});
+}
+
+async function processExcelFile(file) {
+    try {
+        const data = await file.arrayBuffer();
+        const workbook = XLSX.read(data, { type: 'array' });
+        const firstSheetName = workbook.SheetNames[0];
+        const worksheet = workbook.Sheets[firstSheetName];
+        const jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
+        
+        // First row contains headers, subsequent rows contain data
+        const headers = jsonData[0];
+        const rows = jsonData.slice(1);
+        debugger;
+        // Create parameter options from Excel data
+        createParametersFromExcel(headers, rows);
+        
+    } catch (error) {
+        alert('Error processing Excel file: ' + error.message);
+    }
+}
+
+function createParametersFromExcel(headers, rows) {
+    // Clear existing parameters
+    document.querySelectorAll('.param-row').forEach(row => row.remove());
+    document.getElementById('emptyParams').classList.remove('hidden');
+    
+    // Find the column indices for each required field
+    const paramNameIndex = headers.findIndex(h => h && h.toLowerCase().includes('parameter name'));
+    const dataTypeIndex = headers.findIndex(h => h && h.toLowerCase().includes('data type'));
+    const keyIndex = headers.findIndex(h => h && h.toLowerCase().includes('key'));
+    const valueIndex = headers.findIndex(h => h && h.toLowerCase().includes('value'));
+    
+    // Validate that we found all required columns
+    if (paramNameIndex === -1 || keyIndex === -1 || valueIndex === -1) {
+        alert('Excel file must contain columns for Parameter Name, Key, and Value');
+        return;
+    }
+    
+    // Group rows by parameter name to collect all possible values for dropdown types
+    const parameterGroups = {};
+    rows.forEach(row => {
+        const paramName = row[paramNameIndex];
+        const dataType = row[dataTypeIndex];
+        const key = row[keyIndex];
+        const value = row[valueIndex];
+        
+        if (!paramName || !key || !value) return;
+        
+        if (!parameterGroups[paramName]) {
+            parameterGroups[paramName] = {
+                dataType: dataType,
+                key: key,
+                values: []
+            };
+        }
+        parameterGroups[paramName].values.push(value);
+    });
+    
+    // Create parameters from grouped data
+    Object.keys(parameterGroups).forEach(paramName => {
+        const paramData = parameterGroups[paramName];
+        const dataType = paramData.dataType ? paramData.dataType.toLowerCase() : '';
+        
+        // Add parameter row
+        document.getElementById('addParam').click();
+        const lastParamRow = document.querySelector('.param-row:last-child');
+        
+        // Fill in the parameter details
+        lastParamRow.querySelector('.param-name').value = paramName;
+        lastParamRow.querySelector('.param-key').value = paramData.key;
+        
+        // Set the parameter type dropdown
+        const typeSelect = lastParamRow.querySelector('.param-type');
+        if (typeSelect && paramData.dataType) {
+            // Try to match the data type to the dropdown options
+            const matchingOption = Array.from(typeSelect.options).find(option => 
+                option.value.toLowerCase() === dataType || 
+                option.textContent.toLowerCase() === dataType
+            );
+            
+            if (matchingOption) {
+                typeSelect.value = matchingOption.value;
+            } else {
+                // If no exact match, try to find a close match
+                const closeMatch = Array.from(typeSelect.options).find(option => 
+                    option.value.toLowerCase().includes(dataType) || 
+                    dataType.includes(option.value.toLowerCase())
+                );
+                if (closeMatch) {
+                    typeSelect.value = closeMatch.value;
+                }
+            }
+        }
+        
+        const valueInput = lastParamRow.querySelector('.param-value');
+        
+        // Handle different data types
+        if (dataType === 'boolean') {
+            // Create boolean dropdown
+            const select = document.createElement('select');
+            select.className = 'param-value';
+            select.innerHTML = `
+                <option value="">Select value...</option>
+                <option value="TRUE">true</option>
+                <option value="FALSE">false</option>
+            `;
+            
+            // Set the value if it exists in the data
+            const firstValue = paramData.values[0];
+            if (firstValue && (firstValue == 'TRUE' || firstValue == 'FALSE')) {
+                select.value = firstValue;
+            }
+            
+            valueInput.parentNode.replaceChild(select, valueInput);
+            select.setAttribute('data-type', 'boolean');
+            select.addEventListener('change', updateUrlPreview);
+            
+        } else if (dataType === 'array') {
+            // Create dropdown for array with comma-separated values as options
+            const select = document.createElement('select');
+            select.className = 'param-value';
+            select.innerHTML = '<option value="">Select value...</option>';
+            
+            // Get all unique values by splitting comma-separated strings
+            const allArrayValues = [];
+            paramData.values.forEach(value => {
+                const splitValues = value.split(',').map(v => v.trim()).filter(v => v);
+                allArrayValues.push(...splitValues);
+            });
+            
+            // Get unique values for the dropdown
+            const uniqueValues = [...new Set(allArrayValues)];
+            
+            uniqueValues.forEach(value => {
+                const option = document.createElement('option');
+                option.value = value;
+                option.textContent = value;
+                select.appendChild(option);
+            });
+            
+            valueInput.parentNode.replaceChild(select, valueInput);
+            select.setAttribute('data-type', 'array');
+            select.addEventListener('change', updateUrlPreview);
+            
+        } else if (dataType === 'string') {
+            // Keep as textbox for string types
+            valueInput.value = paramData.values[0] || '';
+            valueInput.setAttribute('data-type', 'string');
+            valueInput.addEventListener('input', updateUrlPreview);
+            
+        } else if (dataType === 'number' || dataType === 'integer' || dataType === 'float') {
+            // Create number input for numeric types
+            const numberInput = document.createElement('input');
+            numberInput.type = 'number';
+            numberInput.className = 'param-value';
+            numberInput.value = paramData.values[0] || '';
+            numberInput.setAttribute('data-type', dataType);
+            
+            // Add step attribute for float types
+            if (dataType === 'float') {
+                numberInput.step = 'any';
+            }
+            
+            valueInput.parentNode.replaceChild(numberInput, valueInput);
+            numberInput.addEventListener('input', updateUrlPreview);
+            
+        } else {
+            // For other types, create dropdown with unique values
+            const uniqueValues = [...new Set(paramData.values)];
+            
+            const select = document.createElement('select');
+            select.className = 'param-value';
+            select.innerHTML = '<option value="">Select value...</option>';
+            
+            uniqueValues.forEach(value => {
+                const option = document.createElement('option');
+                option.value = value;
+                option.textContent = value;
+                select.appendChild(option);
+            });
+            
+            valueInput.parentNode.replaceChild(select, valueInput);
+            select.setAttribute('data-type', dataType);
+            select.addEventListener('change', updateUrlPreview);
+        }
+    });
+    
+    updateUrlPreview();
+    alert(`Imported ${Object.keys(parameterGroups).length} parameters from Excel file`);
 }
 
 async function testApiRequest(method, url) {
@@ -340,15 +573,33 @@ async function testApiRequest(method, url) {
 	
 	try {
 		// Add CORS proxy for external APIs
-		if (url.includes('weatherstack.com') || url.includes('openweathermap.org') || (!url.includes('localhost') && !url.includes('127.0.0.1'))) {
-			url = 'https://api.allorigins.win/raw?url=' + encodeURIComponent(url);
+		if (url.includes('weatherstack.com') || url.includes('openweathermap.org')) {
+				url = 'https://api.codetabs.com/v1/proxy?quest=' + encodeURIComponent(url);
 		}
 		
-		const response = await fetch(url, {
-			method: method,
-			headers: {
-				'Content-Type': 'application/json',
+		// Build headers object
+		const requestHeaders = {
+			'Content-Type': 'application/json',
+		};
+
+		// Add custom headers from the current form
+		document.querySelectorAll('.header-row').forEach(row => {
+			const name = row.querySelector('.header-name').value.trim();
+			const value = row.querySelector('.header-value').value.trim();
+			if (name && value) {
+				// For proxy requests, you might need to prefix headers
+				if (url.includes('allorigins.win')) {
+					requestHeaders['X-Requested-With'] = 'XMLHttpRequest';
+				}
+				requestHeaders[name] = value;
 			}
+		});
+				
+		const response = await fetch(url, {
+			async: true,
+			crossDomain: true,
+			method: method,
+			headers: requestHeaders
 		});
 		
 		let data;
@@ -380,8 +631,7 @@ async function testApiRequest(method, url) {
 				(typeof data === 'object' && data !== null && 
 				 Object.values(data).some(val => Array.isArray(val)));
 			toggleBtn.style.display = hasSelectableData ? 'inline-block' : 'none';
-		}
-		
+		}		
 	} catch (error) {
 		responseStatus.textContent = 'Error';
 		responseBody.textContent = `Error: ${error.message}`;
@@ -506,17 +756,17 @@ function setupDataSelection(data) {
 					'primitive': '🔤'
 				}[itemData.type] || '•';
 				
-				checkboxItem.innerHTML = `
-					<input type="checkbox" id="item-${itemData.globalIndex}" value="${itemData.globalIndex}">
-					<div class="checkbox-content">
-						<div style="font-size: 11px; color: #6c757d; margin-bottom: 4px;">
-							${typeIndicator} ${itemData.path} (${itemData.type})
-						</div>
-						<div style="max-height: 100px; overflow-y: auto; font-size: 12px;">
-							${JSON.stringify(itemData.item, null, 2)}
-						</div>
-					</div>
-				`;
+				checkboxItem.innerHTML = 
+					`<input type="checkbox" id="item-${itemData.globalIndex}" value="${itemData.globalIndex}">`+
+					'<div class="checkbox-content">'+
+						'<div style="font-size: 11px; color: #6c757d; margin-bottom: 4px;">'+
+							`${typeIndicator} ${itemData.path} (${itemData.type})`+
+						'</div>'+
+						'<div style="max-height: 100px; overflow-y: auto; font-size: 12px;">'+
+							`${JSON.stringify(itemData.item, null, 2)}`+
+						'</div>'+
+					'</div>'
+				;
 				checkboxList.appendChild(checkboxItem);
 			});
 		});
@@ -757,13 +1007,8 @@ function addSelectedItemButtons() {
 				const text = `{${item.parentProperty}:${item.selectedProperty}}`;
 				navigator.clipboard.writeText(text).then(() => {
 					alert('Copied to clipboard!');
-					<!-- const valueTextarea = functionRow.querySelector('.function-value'); -->
-					<!-- valueTextarea.value += text; -->
 				}).catch(() => {
-					alert('Copied to clipboard!');						
-					<!-- // Fallback: just add to textarea if clipboard fails -->
-					<!-- const valueTextarea = functionRow.querySelector('.function-value'); -->
-					<!-- valueTextarea.value += text; -->
+					alert('Copied to clipboard!');				
 				});
 			};
 			descriptionDiv.appendChild(button);
@@ -888,6 +1133,14 @@ function loadRequest(requestId) {
 	document.getElementById('emptyParams').classList.remove('hidden');
 	document.getElementById('emptyFunctions').classList.remove('hidden');
 	
+	// Load headers (add this after loading parameters)
+	request.headers.forEach(header => {
+		document.getElementById('addHeader').click();
+		const lastHeaderRow = document.querySelector('.header-row:last-child');
+		lastHeaderRow.querySelector('.header-name').value = header.name;
+		lastHeaderRow.querySelector('.header-value').value = header.value;
+	});
+	
 	// Load parameters
 	request.parameters.forEach(param => {
 		document.getElementById('addParam').click();
@@ -926,14 +1179,7 @@ function executeSavedFunctions(requestId) {
 	if (!request) return;
 	
 	// Create text content for the file
-	const textContent = `Request: ${request.name}\n` +
-		`Method: ${request.method}\n` +
-		`URL: ${request.url}\n` +
-		`Base URL: ${request.baseUrl}\n` +
-		`Parameters: ${JSON.stringify(request.parameters, null, 2)}\n` +
-		`Functions: ${JSON.stringify(request.functions, null, 2)}\n` +
-		`Response Data: ${currentResponseData ? JSON.stringify(currentResponseData, null, 2) : 'No response data available'}\n` +
-		`Generated on: ${new Date().toISOString()}`;
+	const textContent = `Request: ${request.name}\n Method: ${request.method}\n URL: ${request.url}\n Base URL: ${request.baseUrl}\n Parameters: ${JSON.stringify(request.parameters, null, 2)}\n Functions: ${JSON.stringify(request.functions, null, 2)}\n Response Data: ${currentResponseData ? JSON.stringify(currentResponseData, null, 2) : 'No response data available'}\n Generated on: ${new Date().toISOString()}`;
 	
 	// Create and download the file
 	const blob = new Blob([textContent], { type: 'text/plain' });
@@ -1008,7 +1254,6 @@ function updatePersistentSelectedButtons() {
 						document.querySelector('.function-value:last-of-type');
 					
 					if (activeTextarea && activeTextarea.classList.contains('function-value')) {
-						<!-- activeTextarea.value += text; -->
 						alert('Copied to clipboard!');
 					} else {
 						alert('Copied to clipboard!');
@@ -1020,7 +1265,6 @@ function updatePersistentSelectedButtons() {
 						document.querySelector('.function-value:last-of-type');
 					
 					if (activeTextarea && activeTextarea.classList.contains('function-value')) {
-						<!-- activeTextarea.value += text; -->
 					} else {
 						alert('Please click in a function value field first');
 					}
@@ -1030,6 +1274,39 @@ function updatePersistentSelectedButtons() {
 		}
 	});
 }
+
+let headerCount = 0;
+
+// Add header functionality
+document.getElementById('addHeader').addEventListener('click', function() {
+    headerCount++;
+    
+    const headerRow = document.createElement('div');
+    headerRow.className = 'header-row';
+    headerRow.innerHTML = 
+        '<div class="form-group">'+
+            '<label>Header Name</label>'+
+            '<input type="text" class="header-name" placeholder="Authorization, Content-Type, etc.">'+
+        '</div>'+
+        '<div class="form-group">'+
+            '<label>Header Value</label>'+
+            '<input type="text" class="header-value" placeholder="Bearer token, application/json, etc.">'+
+        '</div>'+
+        '<button type="button" class="btn btn-danger remove-header">Remove</button>'
+    ;
+    
+    document.getElementById('emptyHeaders').classList.add('hidden');
+    document.getElementById('headersContainer').appendChild(headerRow);
+    
+    // Add remove functionality
+    headerRow.querySelector('.remove-header').addEventListener('click', function() {
+        headerRow.remove();
+        
+        if (document.querySelectorAll('.header-row').length === 0) {
+            document.getElementById('emptyHeaders').classList.remove('hidden');
+        }
+    });
+});
 
 // Clear all requests
 document.getElementById('clearAll').addEventListener('click', function() {
