@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Mod Pack Creator</title>
 	<link rel="stylesheet" href="CSS/Style.css">
+	<script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
 </head>
 <body>
     <div class="container">
@@ -38,10 +39,26 @@
                 
                 <div class="url-preview" id="urlPreview">https://api.example.com/endpoint</div>
                 
+				<div class="section-header">
+					<span class="section-title">Headers</span>
+					<button type="button" id="addHeader" class="btn btn-secondary">Add Header</button>
+				</div>
+
+				<div id="headersContainer">
+					<div class="empty-state" id="emptyHeaders">No headers added</div>
+				</div>
+				
                 <div class="section-header">
                     <span class="section-title">URL Parameters</span>
                     <button type="button" id="addParam" class="btn btn-secondary">Add Parameter</button>
-                </div>
+				</div>
+                
+				<!-- Add this in the parameters section, after the "Add Parameter" button -->
+				<div class="section-header">
+					<span class="section-title">Import from Excel</span>
+					<input type="file" id="excelUpload" accept=".xlsx,.xls" style="display: none;">
+					<button type="button" id="uploadExcel" class="btn btn-secondary">Upload Excel File</button>
+				</div>
                 
                 <div id="paramsContainer">
                     <div class="empty-state" id="emptyParams">No parameters added</div>
